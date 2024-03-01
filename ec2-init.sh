@@ -1,18 +1,20 @@
 #!/bin/bash
 
-# Initialize a new EC2 instance.  (Generate a .bashrc, etc.)
+# Initialize a new EC2 instance.  (Generate a bash config, etc.)
 
-# Define functions and contants:
-usage() { echo "usage: $0 [-h|--help] [-f|--force]"; }
+# Define functions, constants, default args:
+usage() { echo "usage: $0 [-h|--help] [-i|--ignore-errors]"; }
 BASH_CONFIG_FILE="$PWD"/.bashrc
+ignore_errors=0
 
 
 # Deal with the command line:
 #############################
 
 # Run getopt:
-options=$(getopt -l "help" -o "h" -- "$@")
+options=$(getopt -l "help,ignore-errors" -o "hi" -- "$@")
 [ $? -eq 0 ] || { echo "error parsing options"; exit -1; }
+echo "$options"
 eval set -- "$options"
 
 # Walk through the options:
@@ -21,6 +23,9 @@ while true ; do
 	-h|--help)
 	    usage
 	    exit 0
+	    ;;
+	-i|--ignore-errors)
+	    ignore_errors=1
 	    ;;
 	--)
 	    shift
@@ -32,10 +37,10 @@ while true ; do
     esac
     shift
 done
-[ $# -eq 0 ] || { echo "error: unrecognized argument: $1"; exit -2; }
+[ $# -eq 0 ] || { echo "error: unrecognized argument: $1"; usage; exit -2; }
 
 
-# Generate a .bashrc:
+# Generate a bash config:
 #####################
 
 read -r -d '' BASH_CONFIG <<EOF
@@ -64,14 +69,22 @@ export PS1="\[\033[${PROMPT_COLOR}\]\u@\h:\W\$ \[\033[00m\]"
 
 EOF
 
-# Bail out if a .bashrc already exists.  (I'm not including an option
-#   to force deletion, because having a script delete ~/.bashrc creeps
-#   me out.)
-[ ! -f $BASH_CONFIG_FILE ] || \
-    { echo "error: $BASH_CONFIG_FILE already exists"; exit -3; }
+# Bail out if a bash config already exists and we're not ignoring errors.
+if [[ -f $BASH_CONFIG_FILE && $ignore_errors -eq 0 ]] ; then
+    echo "error: $BASH_CONFIG_FILE already exists"
+    exit -3
+fi
 
-echo "$BASH_CONFIG" > $BASH_CONFIG_FILE
 
+# Otherwise, don't bail out if we're ignoring errors, but still never
+#   overwrite an existing bash config.
+if [[ $ignore_errors -eq 1 && -f $BASH_CONFIG_FILE ]] ; then
+    echo "$BASH_CONFIG_FILE already exists; skipping"
+else
+
+    echo "Generating $BASH_CONFIG_FILE..."
+    echo "$BASH_CONFIG" > $BASH_CONFIG_FILE
+fi
 
 
 exit 0
